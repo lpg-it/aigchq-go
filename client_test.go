@@ -68,15 +68,17 @@ func TestAsyncChatCompletionAndWait(t *testing.T) {
 				t.Fatal("async chat request must force stream=false")
 			}
 			writeJSON(w, AsyncTaskResponse{
-				TaskID:    "task_1",
-				Status:    TaskStatusPending,
-				PollURL:   "/v1/tasks/task_1",
-				CreatedAt: time.Now(),
+				TaskID:         "task_1",
+				Status:         TaskStatusPending,
+				PollURL:        "/v1/tasks/task_1",
+				ConversationID: "conv_1",
+				InputMessageID: "msg_in_1",
+				CreatedAt:      time.Now(),
 			})
 		case "/v1/tasks/task_1":
 			polls++
 			if polls == 1 {
-				writeJSON(w, TaskResponse{TaskID: "task_1", Status: TaskStatusProcessing, Type: TaskTypeChat})
+				writeJSON(w, TaskResponse{TaskID: "task_1", Status: TaskStatusProcessing, Type: TaskTypeChat, ConversationID: "conv_1", InputMessageID: "msg_in_1"})
 				return
 			}
 			result, _ := json.Marshal(ChatCompletionResponse{
@@ -87,10 +89,13 @@ func TestAsyncChatCompletionAndWait(t *testing.T) {
 				Choices: []Choice{{Index: 0, Message: Message{Role: "assistant", Content: "done"}}},
 			})
 			writeJSON(w, TaskResponse{
-				TaskID: "task_1",
-				Status: TaskStatusCompleted,
-				Type:   TaskTypeChat,
-				Result: result,
+				TaskID:          "task_1",
+				Status:          TaskStatusCompleted,
+				Type:            TaskTypeChat,
+				Result:          result,
+				ConversationID:  "conv_1",
+				InputMessageID:  "msg_in_1",
+				OutputMessageID: "msg_out_1",
 			})
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)

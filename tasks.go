@@ -26,23 +26,29 @@ const (
 )
 
 type AsyncTaskResponse struct {
-	TaskID    string     `json:"task_id"`
-	Status    TaskStatus `json:"status"`
-	PollURL   string     `json:"poll_url,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
+	TaskID          string     `json:"task_id"`
+	Status          TaskStatus `json:"status"`
+	PollURL         string     `json:"poll_url,omitempty"`
+	ConversationID  string     `json:"conversation_id,omitempty"`
+	InputMessageID  string     `json:"input_message_id,omitempty"`
+	OutputMessageID string     `json:"output_message_id,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
 type TaskResponse struct {
-	TaskID      string          `json:"task_id"`
-	Provider    string          `json:"provider"`
-	Model       string          `json:"model"`
-	Type        TaskType        `json:"type"`
-	Status      TaskStatus      `json:"status"`
-	Progress    float64         `json:"progress,omitempty"`
-	Result      json.RawMessage `json:"result,omitempty"`
-	Error       string          `json:"error,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
-	CompletedAt *time.Time      `json:"completed_at,omitempty"`
+	TaskID          string          `json:"task_id"`
+	Provider        string          `json:"provider"`
+	Model           string          `json:"model"`
+	Type            TaskType        `json:"type"`
+	Status          TaskStatus      `json:"status"`
+	Progress        float64         `json:"progress,omitempty"`
+	Result          json.RawMessage `json:"result,omitempty"`
+	Error           string          `json:"error,omitempty"`
+	ConversationID  string          `json:"conversation_id,omitempty"`
+	InputMessageID  string          `json:"input_message_id,omitempty"`
+	OutputMessageID string          `json:"output_message_id,omitempty"`
+	CreatedAt       time.Time       `json:"created_at"`
+	CompletedAt     *time.Time      `json:"completed_at,omitempty"`
 }
 
 func (t *TaskResponse) IsTerminal() bool {

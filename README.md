@@ -283,6 +283,8 @@ for {
 
 异步接口不是 OpenAI 标准接口，它是 AIGCHQ 为长任务提供的任务接口。
 
+任务会持久化在平台数据库中，并和平台会话消息关联：创建任务时会生成用户消息，任务完成后会生成助手消息。服务重启后已经完成或失败的任务仍可查询；重启时仍处于 `processing` 的任务会被标记为失败，调用方可以重新创建任务。
+
 对应 HTTP API：
 
 ```http
@@ -314,9 +316,13 @@ fmt.Println(task.PollURL)
   "task_id": "task_01HX...",
   "status": "pending",
   "poll_url": "/v1/tasks/task_01HX...",
+  "conversation_id": "conv_01HX...",
+  "input_message_id": "msg_in_...",
   "created_at": "2026-05-12T10:00:00Z"
 }
 ```
+
+`conversation_id` 是平台侧长期会话 ID。后续如果你希望继续同一个对话，把它放回 chat/image 请求的 `conversation_id` 字段即可；平台会继续粘住同一个上游账号和上游对话。`input_message_id` 是本次请求创建的用户消息 ID。
 
 ### 第二步：轮询任务
 
@@ -339,6 +345,8 @@ fmt.Println(state.Status)
   "type": "chat",
   "status": "processing",
   "progress": 0.25,
+  "conversation_id": "conv_01HX...",
+  "input_message_id": "msg_in_...",
   "created_at": "2026-05-12T10:00:00Z"
 }
 ```
@@ -352,6 +360,9 @@ fmt.Println(state.Status)
   "model": "gpt-5-5-thinking",
   "type": "chat",
   "status": "completed",
+  "conversation_id": "conv_01HX...",
+  "input_message_id": "msg_in_...",
+  "output_message_id": "msg_out_...",
   "result": {
     "id": "chatcmpl_...",
     "object": "chat.completion",
@@ -383,6 +394,8 @@ fmt.Println(state.Status)
   "type": "chat",
   "status": "failed",
   "error": "upstream quota exceeded",
+  "conversation_id": "conv_01HX...",
+  "input_message_id": "msg_in_...",
   "created_at": "2026-05-12T10:00:00Z",
   "completed_at": "2026-05-12T10:00:05Z"
 }
@@ -426,6 +439,8 @@ resp, err := client.CreateChatCompletionAndWait(
 ## 连续对话
 
 第一次请求不要自己构造上游对话 ID。第一次请求完成后，如果响应里有 `conversation_id` 或 `conversation`，后续请求原样传回。
+
+异步接口创建任务时就会返回 `ConversationID`，不必等任务完成；你可以保存 `task.ConversationID`，下一次请求传入 `ConversationID: task.ConversationID`。
 
 ```go
 first, err := client.CreateChatCompletion(ctx, &aigchq.ChatCompletionRequest{
@@ -545,6 +560,9 @@ resp, err := client.CreateImageGenerationAndWait(
   "task_id": "task_01HY...",
   "type": "image",
   "status": "completed",
+  "conversation_id": "conv_01HY...",
+  "input_message_id": "msg_in_...",
+  "output_message_id": "msg_out_...",
   "result": {
     "created": 1778569000,
     "data": [
@@ -1376,6 +1394,9 @@ _ = resp
 - `Progress`
 - `Result`
 - `Error`
+- `ConversationID`: 平台侧长期会话 ID，可用于继续同一个对话
+- `InputMessageID`: 本次任务对应的用户消息 ID
+- `OutputMessageID`: 本次任务完成后生成的助手消息 ID
 - `CreatedAt`
 - `CompletedAt`
 
