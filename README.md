@@ -86,11 +86,11 @@ client, err := aigchq.NewClient(
 ```go
 client, err := aigchq.NewClient(
 	os.Getenv("AIGCHQ_API_KEY"),
-	aigchq.WithTimeout(5*time.Minute),
+	aigchq.WithTimeout(10*time.Minute),
 )
 ```
 
-同步接口会占用当前 HTTP 请求生命周期。长任务建议使用异步接口，避免 Nginx、Cloudflare 或调用方超时。
+SDK 默认 HTTP 超时是 10 分钟。同步接口会占用当前 HTTP 请求生命周期；长任务仍建议使用异步接口，避免 Nginx、Cloudflare 或调用方超时。
 
 ### 自定义 HTTP Client
 

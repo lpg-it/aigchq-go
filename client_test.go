@@ -11,6 +11,19 @@ import (
 	"time"
 )
 
+func TestNewClientDefaultTimeout(t *testing.T) {
+	client, err := NewClient("test-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.httpClient == nil {
+		t.Fatal("http client is nil")
+	}
+	if client.httpClient.Timeout != 10*time.Minute {
+		t.Fatalf("timeout = %s, want 10m", client.httpClient.Timeout)
+	}
+}
+
 func TestCreateChatCompletion(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {

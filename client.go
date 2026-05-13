@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://aigchq.com"
+	defaultBaseURL     = "https://aigchq.com"
+	defaultHTTPTimeout = 10 * time.Minute
 )
 
 // Client is the official Go client for the AIGCHQ API.
@@ -54,7 +55,7 @@ func NewClient(apiKey string, opts ...Option) (*Client, error) {
 		apiKey:  strings.TrimSpace(apiKey),
 		headers: make(http.Header),
 		httpClient: &http.Client{
-			Timeout: 120 * time.Second,
+			Timeout: defaultHTTPTimeout,
 		},
 		retry: RetryConfig{
 			MaxRetries: 2,
@@ -112,7 +113,7 @@ func WithHTTPClient(httpClient *http.Client) Option {
 	}
 }
 
-// WithTimeout sets the default timeout on the SDK-owned HTTP client.
+// WithTimeout sets the timeout on the SDK-owned HTTP client.
 func WithTimeout(timeout time.Duration) Option {
 	return func(c *Client) error {
 		if timeout <= 0 {
