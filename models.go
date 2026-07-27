@@ -14,6 +14,20 @@ const (
 	ModelGemini36FlashExtended     = "gemini-3.6-flash-extended"
 	ModelGemini31ProExtended       = "gemini-3.1-pro-extended"
 
+	// Qwen Web fallback chat models. Live account catalogs from
+	// GET /api/qwen-web/models are authoritative when available.
+	ModelQwen37Plus  = "qwen3.7-plus"
+	ModelQwen36Plus  = "qwen3.6-plus"
+	ModelQwen35Flash = "qwen3.5-flash"
+
+	// Explicit Qwen mode suffixes. Prefer a base model plus ReasoningEffort /
+	// WebSearch when possible; these aliases remain convenient for clients.
+	ModelQwen37PlusThinking       = "qwen3.7-plus-thinking"
+	ModelQwen37PlusSearch         = "qwen3.7-plus-search"
+	ModelQwen37PlusThinkingSearch = "qwen3.7-plus-thinking-search"
+	ModelQwen37PlusFast           = "qwen3.7-plus-fast"
+	ModelQwen37PlusFastSearch     = "qwen3.7-plus-fast-search"
+
 	ReasoningEffortNone     = "none"
 	ReasoningEffortMinimal  = "minimal"
 	ReasoningEffortLow      = "low"

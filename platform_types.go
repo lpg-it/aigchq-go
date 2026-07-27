@@ -8,6 +8,7 @@ import (
 const (
 	ProviderChatGPT = "chatgpt-web"
 	ProviderGemini  = "gemini-web"
+	ProviderQwen    = "qwen-web"
 	ImageHostFImage = "f-image"
 )
 

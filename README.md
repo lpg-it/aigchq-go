@@ -154,7 +154,8 @@ client.SetAPIKey("gf_new_key")
 | 使用 Gemini 原生 `generateContent` | `GenerateGeminiContent` | 支持原生 parts、thinkingConfig 和 thought 响应 |
 | 使用 Gemini 原生流式接口 | `GenerateGeminiContentStream` | 读取 `streamGenerateContent` SSE |
 | 生成图片且可能耗时 | `CreateAsyncImageGeneration` + `WaitImageGeneration` | 避免长连接超时 |
-| 强制用 Gemini 或 ChatGPT | `client.Provider(...).Create...` | 走 provider 专属路由 |
+| 强制用 Gemini、ChatGPT 或 Qwen | `client.Provider(...).Create...` | 走 provider 专属路由 |
+| 强制使用 Qwen Web | `CreateQwenChatCompletion` / `ListQwenModels` | 封装 `/api/qwen-web/*` |
 | 管理账号、日志、统计 | `ListProviderCredentials` 等平台方法 | 封装后台管理 API |
 
 ## Gemini 三模型、扩展思考和附件
@@ -275,9 +276,105 @@ resp, err := client.CreateChatCompletion(ctx, &aigchq.ChatCompletionRequest{
 `ImageURL.URL` 和 `InputFile.URL` 也可以使用无需鉴权的公网 HTTP(S) URL。
 本地文件应先转换为 data URI；不要传本机路径或 `file://` URL。包含本地
 data URI 的附件必须使用同步接口。同步 Chat 的 JSON 请求体上限为 150 MiB，
-异步任务请求体上限为 4 MiB 且附件只接受公网 HTTP(S) URL。Gemini provider
-最多接收 8 个附件，单个附件及全部附件解码后的总大小均以 100 MiB 为上限；
-base64/data URI 会使 JSON 请求体膨胀，请同时预留编码开销。
+异步任务请求体上限为 4 MiB 且附件只接受公网 HTTP(S) URL。Gemini 与 Qwen
+provider 最多接收 8 个附件，单个附件及全部附件解码后的总大小均以 100 MiB
+为上限；base64/data URI 会使 JSON 请求体膨胀，请同时预留编码开销。
+
+## Qwen Web 模型、思考、搜索和视频
+
+SDK 为 Qwen Web 提供 provider 常量和常用模型常量：
+
+```go
+aigchq.ProviderQwen // qwen-web
+
+aigchq.ModelQwen37Plus  // qwen3.7-plus
+aigchq.ModelQwen36Plus  // qwen3.6-plus
+aigchq.ModelQwen35Flash // qwen3.5-flash
+
+aigchq.ModelQwen37PlusThinking       // qwen3.7-plus-thinking
+aigchq.ModelQwen37PlusSearch         // qwen3.7-plus-search
+aigchq.ModelQwen37PlusThinkingSearch // qwen3.7-plus-thinking-search
+aigchq.ModelQwen37PlusFast           // qwen3.7-plus-fast
+aigchq.ModelQwen37PlusFastSearch     // qwen3.7-plus-fast-search
+```
+
+真实可用模型以授权账号的实时目录为准：
+
+```go
+models, err := client.ListQwenModels(ctx)
+// 等价于 client.Provider(aigchq.ProviderQwen).ListModels(ctx)
+```
+
+旧凭据没有模型列表时，服务端会回退到 `qwen3.7-plus`、`qwen3.6-plus` 和
+`qwen3.5-flash`。每个基础模型都会暴露 `-fast`；只有实时能力表声明支持
+思考或搜索时，才会暴露 `-thinking`、`-search`、`-fast-search` 和
+`-thinking-search`。
+
+推荐写法：
+
+```go
+resp, err := client.CreateQwenChatCompletion(ctx, &aigchq.ChatCompletionRequest{
+	Model: aigchq.ModelQwen37Plus,
+	Messages: []aigchq.Message{
+		{Role: "user", Content: "深入分析这个方案"},
+	},
+	ReasoningEffort: aigchq.ReasoningEffortHigh, // 开启 thinking
+	WebSearch:       true,                       // 开启联网搜索
+})
+```
+
+也可以直接使用显式后缀模型 ID：
+
+```go
+req := &aigchq.ChatCompletionRequest{
+	Model: aigchq.ModelQwen37PlusThinkingSearch,
+	Messages: []aigchq.Message{
+		{Role: "user", Content: "结合最新资料总结"},
+	},
+}
+```
+
+Qwen Web 支持图片、文档、音频和视频附件。视频分析示例：
+
+```go
+resp, err := client.CreateQwenChatCompletion(ctx, &aigchq.ChatCompletionRequest{
+	Model: aigchq.ModelQwen37PlusThinking,
+	Messages: []aigchq.Message{{
+		Role: "user",
+		Content: []aigchq.ContentPart{
+			{Type: "text", Text: "分析视频内容并给出时间轴摘要"},
+			{
+				Type: "input_file",
+				File: &aigchq.InputFile{
+					Data:     "data:video/mp4;base64,BASE64_VIDEO_BYTES",
+					Filename: "episode-1.mp4",
+					MimeType: "video/mp4",
+				},
+			},
+		},
+	}},
+})
+if err != nil {
+	return err
+}
+fmt.Println("thinking:", resp.Choices[0].Message.ReasoningContent)
+fmt.Println("answer:", resp.Choices[0].Message.Content)
+```
+
+Qwen 限制与 Gemini 多模态 chat 一致：
+
+- 最多 8 个附件
+- 解码后单附件和附件合计均不超过 100,000,000 字节
+- 本地 data URI/base64 必须使用同步接口
+- 异步任务只接受公网 HTTP(S) 附件 URL，JSON 请求体上限 4 MiB
+- 同步 `Message.ReasoningContent` 和流式 `Delta.ReasoningContent` 可读取可见思考摘要
+
+运行示例：
+
+```bash
+AIGCHQ_API_KEY=gf_xxx go run ./examples/qwen
+AIGCHQ_API_KEY=gf_xxx AIGCHQ_QWEN_VIDEO_PATH=/path/to/clip.mp4 go run ./examples/qwen
+```
 
 工具调用：
 
@@ -732,6 +829,7 @@ resp, err := client.CreateImageGenerationAndWait(
 const (
 	aigchq.ProviderChatGPT = "chatgpt-web"
 	aigchq.ProviderGemini  = "gemini-web"
+	aigchq.ProviderQwen    = "qwen-web"
 )
 ```
 
@@ -747,6 +845,7 @@ SDK：
 
 ```go
 models, err := client.Provider(aigchq.ProviderGemini).ListModels(ctx)
+qwenModels, err := client.ListQwenModels(ctx)
 ```
 
 ### Provider Chat 同步
@@ -766,6 +865,13 @@ resp, err := client.Provider(aigchq.ProviderGemini).CreateChatCompletion(ctx, &a
 		{Role: "user", Content: "解释负载均衡。"},
 	},
 })
+
+qwenResp, err := client.CreateQwenChatCompletion(ctx, &aigchq.ChatCompletionRequest{
+	Model: aigchq.ModelQwen37Plus,
+	Messages: []aigchq.Message{
+		{Role: "user", Content: "总结这段文字。"},
+	},
+})
 ```
 
 ### Provider Chat 流式
@@ -773,6 +879,13 @@ resp, err := client.Provider(aigchq.ProviderGemini).CreateChatCompletion(ctx, &a
 ```go
 stream, err := client.Provider(aigchq.ProviderChatGPT).CreateChatCompletionStream(ctx, &aigchq.ChatCompletionRequest{
 	Model: "gpt-5-5-instant",
+	Messages: []aigchq.Message{
+		{Role: "user", Content: "流式输出。"},
+	},
+})
+
+qwenStream, err := client.CreateQwenChatCompletionStream(ctx, &aigchq.ChatCompletionRequest{
+	Model: aigchq.ModelQwen37Plus,
 	Messages: []aigchq.Message{
 		{Role: "user", Content: "流式输出。"},
 	},
@@ -1467,6 +1580,11 @@ _ = resp
 | `Provider(name).CreateImageGeneration` | `POST /api/{provider}/images/generations` | provider 同步图片 |
 | `Provider(name).CreateAsyncImageGeneration` | `POST /api/{provider}/async/images/generations` | provider 异步图片 |
 | `Provider(name).CreateImageGenerationAndWait` | provider async + task | provider 创建并轮询图片 |
+| `ListQwenModels` | `GET /api/qwen-web/models` | Qwen Web 模型列表 |
+| `CreateQwenChatCompletion` | `POST /api/qwen-web/chat/completions` | Qwen Web 同步 chat |
+| `CreateQwenChatCompletionStream` | `POST /api/qwen-web/chat/completions` | Qwen Web 流式 chat |
+| `CreateAsyncQwenChatCompletion` | `POST /api/qwen-web/async/chat/completions` | Qwen Web 异步 chat |
+| `CreateQwenChatCompletionAndWait` | Qwen async + task | Qwen 创建并轮询 chat |
 | `Register` | `POST /api/auth/register` | 注册平台用户 |
 | `Login` | `POST /api/auth/login` | 登录平台用户 |
 | `Logout` | `POST /api/auth/logout` | 登出 |
@@ -1562,6 +1680,7 @@ done := task.IsTerminal()
 - `examples/async`: 异步 chat 创建和轮询
 - `examples/streaming`: 流式 chat
 - `examples/image`: 异步图片生成
+- `examples/qwen`: Qwen Web 文本/视频分析
 - `examples/admin`: provider 账号和请求日志
 
 运行：
@@ -1571,6 +1690,8 @@ AIGCHQ_API_KEY=gf_xxx go run ./examples/chat
 AIGCHQ_API_KEY=gf_xxx go run ./examples/async
 AIGCHQ_API_KEY=gf_xxx go run ./examples/streaming
 AIGCHQ_API_KEY=gf_xxx go run ./examples/image
+AIGCHQ_API_KEY=gf_xxx go run ./examples/qwen
+AIGCHQ_API_KEY=gf_xxx AIGCHQ_QWEN_VIDEO_PATH=/path/to/clip.mp4 go run ./examples/qwen
 AIGCHQ_API_KEY=gf_xxx go run ./examples/admin
 ```
 
