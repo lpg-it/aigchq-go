@@ -171,6 +171,7 @@ func TestChatCompletionStream(t *testing.T) {
 			t.Fatalf("unexpected accept: %q", got)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, `data: {"id":"chunk_1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"reasoning_content":"think"}}]}`+"\n\n")
 		_, _ = io.WriteString(w, `data: {"id":"chunk_1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"hel"}}]}`+"\n\n")
 		_, _ = io.WriteString(w, `data: {"id":"chunk_1","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"lo"}}]}`+"\n\n")
 		_, _ = io.WriteString(w, "data: [DONE]\n\n")
@@ -187,7 +188,7 @@ func TestChatCompletionStream(t *testing.T) {
 	}
 	defer stream.Close()
 
-	var text string
+	var text, reasoning string
 	for {
 		chunk, err := stream.Recv()
 		if err == io.EOF {
@@ -197,9 +198,13 @@ func TestChatCompletionStream(t *testing.T) {
 			t.Fatal(err)
 		}
 		text += chunk.Choices[0].Delta.Content
+		reasoning += chunk.Choices[0].Delta.ReasoningContent
 	}
 	if text != "hello" {
 		t.Fatalf("unexpected stream text: %q", text)
+	}
+	if reasoning != "think" {
+		t.Fatalf("unexpected stream reasoning: %q", reasoning)
 	}
 }
 

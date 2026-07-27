@@ -151,9 +151,54 @@ client.SetAPIKey("gf_new_key")
 | 要兼容 OpenAI `/v1/chat/completions` | `CreateChatCompletion` | 同步接口，调用方等待最终响应 |
 | 聊天可能超过 60 秒 | `CreateAsyncChatCompletion` + `WaitChatCompletion` | 创建任务后轮询，最适合外部系统集成 |
 | 需要边生成边显示 | `CreateChatCompletionStream` | SSE 流式读取 chunk |
+| 使用 Gemini 原生 `generateContent` | `GenerateGeminiContent` | 支持原生 parts、thinkingConfig 和 thought 响应 |
+| 使用 Gemini 原生流式接口 | `GenerateGeminiContentStream` | 读取 `streamGenerateContent` SSE |
 | 生成图片且可能耗时 | `CreateAsyncImageGeneration` + `WaitImageGeneration` | 避免长连接超时 |
 | 强制用 Gemini 或 ChatGPT | `client.Provider(...).Create...` | 走 provider 专属路由 |
 | 管理账号、日志、统计 | `ListProviderCredentials` 等平台方法 | 封装后台管理 API |
+
+## Gemini 三模型、扩展思考和附件
+
+SDK 为 Gemini Web 当前三个模型提供常量：
+
+```go
+aigchq.ModelGemini35FlashLite // gemini-3.5-flash-lite
+aigchq.ModelGemini36Flash     // gemini-3.6-flash
+aigchq.ModelGemini31Pro       // gemini-3.1-pro
+```
+
+三个模型使用相同的附件结构，均可在对话中传图片、视频、音频、PDF
+和普通文件。推荐选择基础模型并设置 `ReasoningEffort` 开启扩展思考：
+
+```go
+req := &aigchq.ChatCompletionRequest{
+	Model: aigchq.ModelGemini36Flash,
+	Messages: []aigchq.Message{
+		{Role: "user", Content: "深入分析这个方案"},
+	},
+	ReasoningEffort: aigchq.ReasoningEffortHigh,
+}
+```
+
+`medium`、`high`、`xhigh`、`max`、`extended` 会选择扩展思考；
+`none`、`minimal`、`low` 或省略字段会使用基础模式。SDK 也保留
+`ModelGemini35FlashLiteExtended`、`ModelGemini36FlashExtended` 和
+`ModelGemini31ProExtended` 三个显式兼容常量。
+
+API 还接受 boolean、string 或 object 形式的 `thinking`。object 形式可使用
+`ThinkingConfig`：
+
+```go
+budget := 4096
+req.Thinking = &aigchq.ThinkingConfig{
+	Type:         "enabled",
+	BudgetTokens: &budget,
+}
+```
+
+同步响应中的可见思考摘要位于
+`resp.Choices[0].Message.ReasoningContent`，流式响应则位于
+`chunk.Choices[0].Delta.ReasoningContent`。
 
 ## Chat 同步接口
 
@@ -200,20 +245,39 @@ req := &aigchq.ChatCompletionRequest{
 
 ```go
 resp, err := client.CreateChatCompletion(ctx, &aigchq.ChatCompletionRequest{
-	Model: "gpt-5-5-thinking",
+	Model: aigchq.ModelGemini36Flash,
 	Messages: []aigchq.Message{
 		{
 			Role: "user",
 			Content: []aigchq.ContentPart{
-				{Type: "text", Text: "描述这张图"},
-				{Type: "image_url", ImageURL: &aigchq.ImageURL{
-					URL: "https://example.com/image.png",
-				}},
+				{Type: "text", Text: "识别视频字幕，并参考图片说明场景"},
+				{
+					Type: "input_image",
+					Name: "reference.png",
+					ImageURL: &aigchq.ImageURL{
+						URL: "data:image/png;base64,BASE64_IMAGE_BYTES",
+					},
+				},
+				{
+					Type: "input_file",
+					File: &aigchq.InputFile{
+						Data:     "data:video/mp4;base64,BASE64_VIDEO_BYTES",
+						Filename: "episode-1.mp4",
+						MimeType: "video/mp4",
+					},
+				},
 			},
 		},
 	},
 })
 ```
+
+`ImageURL.URL` 和 `InputFile.URL` 也可以使用无需鉴权的公网 HTTP(S) URL。
+本地文件应先转换为 data URI；不要传本机路径或 `file://` URL。包含本地
+data URI 的附件必须使用同步接口。同步 Chat 的 JSON 请求体上限为 150 MiB，
+异步任务请求体上限为 4 MiB 且附件只接受公网 HTTP(S) URL。Gemini provider
+最多接收 8 个附件，单个附件及全部附件解码后的总大小均以 100 MiB 为上限；
+base64/data URI 会使 JSON 请求体膨胀，请同时预留编码开销。
 
 工具调用：
 
@@ -276,6 +340,89 @@ for {
 		continue
 	}
 	fmt.Print(chunk.Choices[0].Delta.Content)
+}
+```
+
+## Gemini 原生 v1beta 接口
+
+SDK 对 `/v1beta/models`、`generateContent` 和 `streamGenerateContent`
+提供 typed client。原生 `inlineData` 可传 base64 图片、音频或视频；
+`fileData.fileUri` 可传无需额外凭据即可下载的公网 HTTP(S) 文件 URL。
+
+列出和读取模型：
+
+```go
+models, err := client.ListGeminiModels(ctx)
+model, err := client.GetGeminiModel(ctx, aigchq.ModelGemini36Flash)
+```
+
+原生附件与扩展思考：
+
+```go
+includeThoughts := true
+
+resp, err := client.GenerateGeminiContent(ctx, aigchq.ModelGemini31Pro, &aigchq.GeminiGenerateRequest{
+	Contents: []aigchq.GeminiContent{
+		{
+			Role: "user",
+			Parts: []aigchq.GeminiPart{
+				{Text: "识别视频内容，并对照 PDF 总结"},
+				{InlineData: &aigchq.GeminiInlineData{
+					MimeType: "video/mp4",
+					Data:     "BASE64_VIDEO_BYTES",
+				}},
+				{FileData: &aigchq.GeminiFileData{
+					MimeType: "application/pdf",
+					FileURI:  "https://example.com/brief.pdf",
+				}},
+			},
+		},
+	},
+	GenerationConfig: &aigchq.GeminiGenerationConfig{
+		ThinkingConfig: &aigchq.GeminiThinkingConfig{
+			ThinkingLevel:   "HIGH",
+			IncludeThoughts: &includeThoughts,
+		},
+	},
+})
+if err != nil {
+	return err
+}
+
+for _, part := range resp.Candidates[0].Content.Parts {
+	if part.Thought {
+		fmt.Println("thinking:", part.Text)
+		continue
+	}
+	fmt.Println("answer:", part.Text)
+}
+```
+
+原生流式响应：
+
+```go
+stream, err := client.GenerateGeminiContentStream(ctx, aigchq.ModelGemini36Flash, request)
+if err != nil {
+	return err
+}
+defer stream.Close()
+
+for {
+	chunk, err := stream.Recv()
+	if err == io.EOF {
+		break
+	}
+	if err != nil {
+		return err
+	}
+	for _, candidate := range chunk.Candidates {
+		for _, part := range candidate.Content.Parts {
+			if part.Thought {
+				fmt.Print("[thinking] ")
+			}
+			fmt.Print(part.Text)
+		}
+	}
 }
 ```
 
@@ -1357,7 +1504,8 @@ _ = resp
 - `Temperature`, `TopP`, `MaxTokens`
 - `Tools`, `ToolChoice`, `ParallelToolCalls`
 - `ResponseFormat`
-- `ReasoningEffort`
+- `ReasoningEffort`, `Thinking`: 扩展思考控制
+- `Image`, `ImageName`, `Images`, `Media`: 请求级多模态兼容字段
 - `Provider`: 指定 provider，通常优先使用 `client.Provider(...)`
 - `Account`: 指定账号名或邮箱
 - `ConversationID`, `ParentMessageID`, `Conversation`: 连续对话

@@ -15,14 +15,42 @@ type Message struct {
 }
 
 type ContentPart struct {
-	Type     string    `json:"type"`
-	Text     string    `json:"text,omitempty"`
-	ImageURL *ImageURL `json:"image_url,omitempty"`
+	Type     string     `json:"type"`
+	Text     string     `json:"text,omitempty"`
+	ImageURL *ImageURL  `json:"image_url,omitempty"`
+	File     *InputFile `json:"file,omitempty"`
+	Name     string     `json:"name,omitempty"`
+	MimeType string     `json:"mime_type,omitempty"`
 }
 
 type ImageURL struct {
 	URL    string `json:"url"`
 	Detail string `json:"detail,omitempty"`
+}
+
+// InputFile describes an OpenAI-compatible input_file content part.
+//
+// Data accepts a data URI, URL accepts a public HTTP(S) URL, and FileData is
+// retained for compatibility with request-level AIGCHQ media objects.
+type InputFile struct {
+	Data     string `json:"data,omitempty"`
+	URL      string `json:"url,omitempty"`
+	FileData string `json:"file_data,omitempty"`
+	Filename string `json:"filename,omitempty"`
+	Name     string `json:"name,omitempty"`
+	MimeType string `json:"mime_type,omitempty"`
+}
+
+// ThinkingConfig is the object form accepted by ChatCompletionRequest.Thinking.
+// The field itself is any because the API also accepts booleans and strings.
+type ThinkingConfig struct {
+	Type            string `json:"type,omitempty"`
+	Enabled         *bool  `json:"enabled,omitempty"`
+	Level           string `json:"level,omitempty"`
+	ThinkingLevel   string `json:"thinking_level,omitempty"`
+	BudgetTokens    *int   `json:"budget_tokens,omitempty"`
+	ThinkingBudget  *int   `json:"thinking_budget,omitempty"`
+	IncludeThoughts *bool  `json:"include_thoughts,omitempty"`
 }
 
 type Tool struct {
@@ -69,6 +97,7 @@ type ChatCompletionRequest struct {
 	ParallelToolCalls *bool              `json:"parallel_tool_calls,omitempty"`
 	ResponseFormat    *ResponseFormat    `json:"response_format,omitempty"`
 	ReasoningEffort   string             `json:"reasoning_effort,omitempty"`
+	Thinking          any                `json:"thinking,omitempty"`
 	Audio             map[string]any     `json:"audio,omitempty"`
 	Modalities        []string           `json:"modalities,omitempty"`
 	Provider          string             `json:"provider,omitempty"`
