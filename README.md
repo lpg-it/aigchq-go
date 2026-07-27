@@ -369,6 +369,38 @@ Qwen 限制与 Gemini 多模态 chat 一致：
 - 异步任务只接受公网 HTTP(S) 附件 URL，JSON 请求体上限 4 MiB
 - 同步 `Message.ReasoningContent` 和流式 `Delta.ReasoningContent` 可读取可见思考摘要
 
+### 同步 vs 异步视频分析
+
+| 场景 | 推荐方法 | 附件写法 |
+| --- | --- | --- |
+| 本地视频文件 / data URI / base64 | `CreateQwenChatCompletion`（同步） | `InputFile.Data = "data:video/mp4;base64,..."` |
+| 已可公网访问的视频 URL | `CreateQwenChatCompletionAndWait` 或 `CreateAsyncQwenChatCompletion` | `InputFile.URL = "https://.../clip.mp4"` |
+
+本地视频**不能**走异步：服务端会拒绝 inline data URI/base64，并返回
+`Inline attachment data is not supported by async tasks`。异步适合“视频已在
+CDN/对象存储上、任务可能较久”的场景：
+
+```go
+// 异步：仅公网 URL
+resp, err := client.CreateQwenChatCompletionAndWait(ctx, &aigchq.ChatCompletionRequest{
+	Model: aigchq.ModelQwen37PlusThinking,
+	Messages: []aigchq.Message{{
+		Role: "user",
+		Content: []aigchq.ContentPart{
+			{Type: "text", Text: "分析视频内容并给出时间轴摘要"},
+			{
+				Type: "input_file",
+				File: &aigchq.InputFile{
+					URL:      "https://cdn.example.com/episode-1.mp4",
+					Filename: "episode-1.mp4",
+					MimeType: "video/mp4",
+				},
+			},
+		},
+	}},
+})
+```
+
 运行示例：
 
 ```bash
