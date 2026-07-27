@@ -64,7 +64,15 @@ func main() {
 		}}
 	}
 
-	resp, err := client.CreateQwenChatCompletion(context.Background(), req)
+	// Prefer async create+poll for long video analysis so reverse proxies do
+	// not idle-timeout a held-open synchronous connection. Local data URI
+	// attachments are accepted; no external object storage is required.
+	var resp *aigchq.ChatCompletionResponse
+	if videoPath := os.Getenv("AIGCHQ_QWEN_VIDEO_PATH"); videoPath != "" {
+		resp, err = client.CreateQwenChatCompletionAndWait(context.Background(), req)
+	} else {
+		resp, err = client.CreateQwenChatCompletion(context.Background(), req)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}

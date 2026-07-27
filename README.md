@@ -275,8 +275,8 @@ resp, err := client.CreateChatCompletion(ctx, &aigchq.ChatCompletionRequest{
 
 `ImageURL.URL` 和 `InputFile.URL` 也可以使用无需鉴权的公网 HTTP(S) URL。
 本地文件应先转换为 data URI；不要传本机路径或 `file://` URL。包含本地
-data URI 的附件必须使用同步接口。同步 Chat 的 JSON 请求体上限为 150 MiB，
-异步任务请求体上限为 4 MiB 且附件只接受公网 HTTP(S) URL。Gemini 与 Qwen
+data URI 的附件可走同步或异步 chat。同步与异步 Chat 的 JSON 请求体上限均为
+150 MiB。长任务推荐异步 create+poll，避免代理超时。Gemini 与 Qwen
 provider 最多接收 8 个附件，单个附件及全部附件解码后的总大小均以 100 MiB
 为上限；base64/data URI 会使 JSON 请求体膨胀，请同时预留编码开销。
 
@@ -365,23 +365,24 @@ Qwen 限制与 Gemini 多模态 chat 一致：
 
 - 最多 8 个附件
 - 解码后单附件和附件合计均不超过 100,000,000 字节
-- 本地 data URI/base64 必须使用同步接口
-- 异步任务只接受公网 HTTP(S) 附件 URL，JSON 请求体上限 4 MiB
+- 同步与异步 chat 的 JSON 请求体上限均为 150 MiB（含 base64 膨胀）
+- 本地 data URI/base64 与公网 HTTP(S) URL 都可用于异步；长任务优先异步
 - 同步 `Message.ReasoningContent` 和流式 `Delta.ReasoningContent` 可读取可见思考摘要
 
 ### 同步 vs 异步视频分析
 
+长任务（视频分析、扩展思考等常超过 10 分钟）**推荐异步**，避免 Nginx /
+Cloudflare 等空闲超时把连接掐掉。异步 chat 与同步 chat 接受相同 body，
+**包括本地 data URI / base64**，不需要额外对象存储：
+
 | 场景 | 推荐方法 | 附件写法 |
 | --- | --- | --- |
-| 本地视频文件 / data URI / base64 | `CreateQwenChatCompletion`（同步） | `InputFile.Data = "data:video/mp4;base64,..."` |
-| 已可公网访问的视频 URL | `CreateQwenChatCompletionAndWait` 或 `CreateAsyncQwenChatCompletion` | `InputFile.URL = "https://.../clip.mp4"` |
-
-本地视频**不能**走异步：服务端会拒绝 inline data URI/base64，并返回
-`Inline attachment data is not supported by async tasks`。异步适合“视频已在
-CDN/对象存储上、任务可能较久”的场景：
+| 本地视频 / 长任务 | `CreateQwenChatCompletionAndWait` 或 `CreateAsyncQwenChatCompletion` | `InputFile.Data = "data:video/mp4;base64,..."` |
+| 公网视频 URL / 长任务 | 同上 | `InputFile.URL = "https://.../clip.mp4"` |
+| 短文本、可接受长连接 | `CreateQwenChatCompletion`（同步） | 任意 |
 
 ```go
-// 异步：仅公网 URL
+// 异步 + 本地视频 data URI（推荐用于长分析）
 resp, err := client.CreateQwenChatCompletionAndWait(ctx, &aigchq.ChatCompletionRequest{
 	Model: aigchq.ModelQwen37PlusThinking,
 	Messages: []aigchq.Message{{
@@ -391,7 +392,7 @@ resp, err := client.CreateQwenChatCompletionAndWait(ctx, &aigchq.ChatCompletionR
 			{
 				Type: "input_file",
 				File: &aigchq.InputFile{
-					URL:      "https://cdn.example.com/episode-1.mp4",
+					Data:     "data:video/mp4;base64,BASE64_VIDEO_BYTES",
 					Filename: "episode-1.mp4",
 					MimeType: "video/mp4",
 				},
