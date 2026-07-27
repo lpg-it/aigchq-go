@@ -40,11 +40,16 @@ func main() {
 		}},
 	}
 
+	// Prefer async create+poll for long video analysis so reverse proxies do
+	// not idle-timeout a held-open synchronous connection. Local data URI
+	// attachments are accepted; no external object storage is required.
+	useAsync := false
 	if videoPath := os.Getenv("AIGCHQ_QWEN_VIDEO_PATH"); videoPath != "" {
 		video, readErr := os.ReadFile(videoPath)
 		if readErr != nil {
 			log.Fatalf("read video: %v", readErr)
 		}
+		useAsync = true
 		req.Messages = []aigchq.Message{{
 			Role: "user",
 			Content: []aigchq.ContentPart{
@@ -64,11 +69,8 @@ func main() {
 		}}
 	}
 
-	// Prefer async create+poll for long video analysis so reverse proxies do
-	// not idle-timeout a held-open synchronous connection. Local data URI
-	// attachments are accepted; no external object storage is required.
 	var resp *aigchq.ChatCompletionResponse
-	if videoPath := os.Getenv("AIGCHQ_QWEN_VIDEO_PATH"); videoPath != "" {
+	if useAsync {
 		resp, err = client.CreateQwenChatCompletionAndWait(context.Background(), req)
 	} else {
 		resp, err = client.CreateQwenChatCompletion(context.Background(), req)
