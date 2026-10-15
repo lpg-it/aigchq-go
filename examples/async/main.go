@@ -15,7 +15,7 @@ func main() {
 	ctx := context.Background()
 
 	task, err := client.CreateAsyncChatCompletion(ctx, &aigchq.ChatCompletionRequest{
-		Model: "gpt-5-5-thinking",
+		Model: aigchq.ModelChatGPTAuto,
 		Messages: []aigchq.Message{
 			{Role: "user", Content: "给我一个适合异步任务的使用场景。"},
 		},

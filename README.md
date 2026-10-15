@@ -36,7 +36,7 @@ func main() {
 	}
 
 	resp, err := client.CreateChatCompletion(context.Background(), &aigchq.ChatCompletionRequest{
-		Model: "gpt-5-5-thinking",
+		Model: aigchq.ModelChatGPTAuto,
 		Messages: []aigchq.Message{
 			{Role: "user", Content: "你好，用一句话介绍 AIGCHQ。"},
 		},
@@ -158,22 +158,23 @@ client.SetAPIKey("gf_new_key")
 | 强制使用 Qwen Web | `CreateQwenChatCompletion` / `ListQwenModels` | 封装 `/api/qwen-web/*` |
 | 管理账号、日志、统计 | `ListProviderCredentials` 等平台方法 | 封装后台管理 API |
 
-## Gemini 三模型、扩展思考和附件
+## Gemini 当前模型、扩展思考和附件
 
-SDK 为 Gemini Web 当前三个模型提供常量：
+Free 账户请求 Gemini Auto。Pro 账户可以请求 3.5 Flash-Lite、3.8 Flash、3.1 Pro 和 4 Argon。
 
 ```go
+aigchq.ModelGeminiAuto        // gemini-auto
 aigchq.ModelGemini35FlashLite // gemini-3.5-flash-lite
-aigchq.ModelGemini36Flash     // gemini-3.6-flash
+aigchq.ModelGemini38Flash     // gemini-3.8-flash
 aigchq.ModelGemini31Pro       // gemini-3.1-pro
+aigchq.ModelGemini4Argon      // gemini-4-argon
 ```
 
-三个模型使用相同的附件结构，均可在对话中传图片、视频、音频、PDF
-和普通文件。推荐选择基础模型并设置 `ReasoningEffort` 开启扩展思考：
+Gemini Web 聊天是文本请求。推荐选择基础模型并设置 `ReasoningEffort` 开启扩展思考：
 
 ```go
 req := &aigchq.ChatCompletionRequest{
-	Model: aigchq.ModelGemini36Flash,
+	Model: aigchq.ModelGemini38Flash,
 	Messages: []aigchq.Message{
 		{Role: "user", Content: "深入分析这个方案"},
 	},
@@ -182,9 +183,49 @@ req := &aigchq.ChatCompletionRequest{
 ```
 
 `medium`、`high`、`xhigh`、`max`、`extended` 会选择扩展思考；
-`none`、`minimal`、`low` 或省略字段会使用基础模式。SDK 也保留
-`ModelGemini35FlashLiteExtended`、`ModelGemini36FlashExtended` 和
-`ModelGemini31ProExtended` 三个显式兼容常量。
+`none`、`minimal`、`low` 或省略字段会使用基础模式。每个基础模型都有对应的
+`*-extended` 常量。`ModelGemini36Flash` 和 `ModelGemini36FlashExtended`
+仍可编译，服务端会把它们转到 3.8 Flash。
+
+图片模型是 `ModelGemini3ProImage` 和 `ModelGemini3FlashImage`。
+
+## ChatGPT 当前模型和对话工具
+
+Free 账户可以请求 Auto 和 GPT-6。
+
+```go
+aigchq.ModelChatGPTAuto   // auto
+aigchq.ModelChatGPTGPT6   // gpt-6
+aigchq.ModelChatGPTImage2 // gpt-image-2
+```
+
+搜索、思考、对话内生图、深度研究、图片和文件都走同一个 chat 请求：
+
+```go
+req := &aigchq.ChatCompletionRequest{
+	Model: aigchq.ModelChatGPTAuto,
+	Messages: []aigchq.Message{
+		{
+			Role: "user",
+			Content: []aigchq.ContentPart{
+				{Type: "text", Text: "总结附件"},
+				{
+					Type: "input_file",
+					File: &aigchq.InputFile{
+						Data:     "data:text/plain;base64,BASE64_FILE_BYTES",
+						Filename: "note.txt",
+						MimeType: "text/plain",
+					},
+				},
+			},
+		},
+	},
+	WebSearch:       true,
+	ReasoningEffort: aigchq.ReasoningEffortMedium,
+}
+```
+
+对话内生图设置 `ImageGeneration: true`。深度研究设置 `DeepResearch: true`。两者同时设置时，服务端优先生成图片。独立图片接口使用 `ModelChatGPTImage2`。定时任务、插件和 Codex 不在这个 SDK 的范围内。
 
 API 还接受 boolean、string 或 object 形式的 `thinking`。object 形式可使用
 `ThinkingConfig`：
@@ -213,7 +254,7 @@ SDK 方法：
 
 ```go
 resp, err := client.CreateChatCompletion(ctx, &aigchq.ChatCompletionRequest{
-	Model: "gpt-5-5-thinking",
+	Model: aigchq.ModelChatGPTAuto,
 	Messages: []aigchq.Message{
 		{Role: "system", Content: "你是一个简洁的助手。"},
 		{Role: "user", Content: "今天是几号？"},
@@ -229,13 +270,14 @@ fmt.Println(resp.Choices[0].Message.Content)
 
 ```go
 req := &aigchq.ChatCompletionRequest{
-	Model: "gpt-5-5-thinking",
+	Model: aigchq.ModelChatGPTGPT6,
 	Messages: []aigchq.Message{
 		{Role: "user", Content: "写一个 Go HTTP 示例。"},
 	},
-	Temperature: ptrFloat64(0.7),
-	MaxTokens:   ptrInt(1000),
-	WebSearch:   true,
+	Temperature:     ptrFloat64(0.7),
+	MaxTokens:       ptrInt(1000),
+	WebSearch:       true,
+	ReasoningEffort: aigchq.ReasoningEffortMedium,
 	Metadata: map[string]any{
 		"trace_id": "trace_123",
 	},
@@ -246,7 +288,7 @@ req := &aigchq.ChatCompletionRequest{
 
 ```go
 resp, err := client.CreateChatCompletion(ctx, &aigchq.ChatCompletionRequest{
-	Model: aigchq.ModelGemini36Flash,
+	Model: aigchq.ModelGemini38Flash,
 	Messages: []aigchq.Message{
 		{
 			Role: "user",
@@ -1660,7 +1702,9 @@ _ = resp
 - `Provider`: 指定 provider，通常优先使用 `client.Provider(...)`
 - `Account`: 指定账号名或邮箱
 - `ConversationID`, `ParentMessageID`, `Conversation`: 连续对话
-- `WebSearch`: 是否启用搜索
+- `WebSearch`: 是否启用搜索。ChatGPT 使用上游搜索，Gemini 与 Qwen 按各自 provider 处理
+- `ImageGeneration`: ChatGPT 在当前对话里生成图片
+- `DeepResearch`: ChatGPT 深度研究
 - `Metadata`, `ExtraBody`: 扩展字段
 
 ### ImageGenerationRequest

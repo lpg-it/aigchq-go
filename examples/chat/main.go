@@ -13,7 +13,7 @@ func main() {
 	client := mustClient()
 
 	resp, err := client.CreateChatCompletion(context.Background(), &aigchq.ChatCompletionRequest{
-		Model: "gpt-5-5-thinking",
+		Model: aigchq.ModelChatGPTAuto,
 		Messages: []aigchq.Message{
 			{Role: "user", Content: "用一句话介绍 AIGCHQ。"},
 		},

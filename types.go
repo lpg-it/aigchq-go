@@ -106,6 +106,8 @@ type ChatCompletionRequest struct {
 	ParentMessageID   string             `json:"parent_message_id,omitempty"`
 	Conversation      map[string]any     `json:"conversation,omitempty"`
 	WebSearch         bool               `json:"web_search,omitempty"`
+	ImageGeneration   bool               `json:"image_generation,omitempty"`
+	DeepResearch      bool               `json:"deep_research,omitempty"`
 	Metadata          map[string]any     `json:"metadata,omitempty"`
 	ExtraBody         map[string]any     `json:"extra_body,omitempty"`
 	Image             string             `json:"image,omitempty"`

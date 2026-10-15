@@ -4,15 +4,36 @@ import "context"
 
 const (
 	// Current Gemini Web text models.
+	// Free accounts can request Gemini Auto. Pro accounts can request
+	// 3.5 Flash-Lite, 3.8 Flash, 3.1 Pro, and 4 Argon.
+	ModelGeminiAuto        = "gemini-auto"
 	ModelGemini35FlashLite = "gemini-3.5-flash-lite"
-	ModelGemini36Flash     = "gemini-3.6-flash"
+	ModelGemini38Flash     = "gemini-3.8-flash"
 	ModelGemini31Pro       = "gemini-3.1-pro"
+	ModelGemini4Argon      = "gemini-4-argon"
 
 	// Explicit extended-thinking model IDs remain available for compatibility.
 	// New code can select a base model and set ReasoningEffort instead.
+	ModelGeminiAutoExtended        = "gemini-auto-extended"
 	ModelGemini35FlashLiteExtended = "gemini-3.5-flash-lite-extended"
-	ModelGemini36FlashExtended     = "gemini-3.6-flash-extended"
+	ModelGemini38FlashExtended     = "gemini-3.8-flash-extended"
 	ModelGemini31ProExtended       = "gemini-3.1-pro-extended"
+	ModelGemini4ArgonExtended      = "gemini-4-argon-extended"
+
+	// Compatibility IDs. The server maps 3.6 Flash onto 3.8 Flash.
+	ModelGemini36Flash         = "gemini-3.6-flash"
+	ModelGemini36FlashExtended = "gemini-3.6-flash-extended"
+
+	// Gemini image models.
+	ModelGemini3ProImage   = "gemini-3-pro-image"
+	ModelGemini3FlashImage = "gemini-3-flash-image"
+
+	// ChatGPT Web models. Free accounts can request Auto and GPT-6.
+	// Image generation is available in chat with ImageGeneration, or through
+	// the image endpoint with ModelChatGPTImage2.
+	ModelChatGPTAuto   = "auto"
+	ModelChatGPTGPT6   = "gpt-6"
+	ModelChatGPTImage2 = "gpt-image-2"
 
 	// Qwen Web fallback chat models. Live account catalogs from
 	// GET /api/qwen-web/models are authoritative when available.

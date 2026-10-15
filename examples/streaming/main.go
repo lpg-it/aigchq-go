@@ -14,7 +14,7 @@ func main() {
 	client := mustClient()
 
 	stream, err := client.CreateChatCompletionStream(context.Background(), &aigchq.ChatCompletionRequest{
-		Model: "gpt-5-5-instant",
+		Model: aigchq.ModelChatGPTGPT6,
 		Messages: []aigchq.Message{
 			{Role: "user", Content: "用三点说明同步流式接口适合什么场景。"},
 		},

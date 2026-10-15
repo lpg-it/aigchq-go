@@ -16,7 +16,7 @@ func main() {
 	resp, err := client.CreateImageGenerationAndWait(
 		context.Background(),
 		&aigchq.ImageGenerationRequest{
-			Model:  "gemini-3.1-pro",
+			Model:  aigchq.ModelChatGPTImage2,
 			Prompt: "一张干净的产品发布会海报，中心是 AIGCHQ API 控制台界面。",
 			Size:   "1024x1024",
 		},
